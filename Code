@@ -1,0 +1,120 @@
+# PGA Dataset for 2019 Season - Sorting Script
+# Sharpe
+#####
+
+# Set a Working Directory
+setwd("C:/Users/nolan/Desktop/MIS500")
+#####
+
+# Load and Evaluate the PGA Dataset
+PGA <- read.csv("2019.data.csv", header=T, stringsAsFactors=FALSE)
+PGA$Date <- as.Date(PGA$Date) # Change the date column to class Date
+PGA <- PGA[order(PGA$Date),]
+# class(PGA) # Output the class of the dataset
+# dim(PGA) # Output the number of rows and columns in the dataset
+# head(PGA) # Output the first 6 rows of the dataset
+###
+# Outputs:
+# "data.frame"
+# 5 variables with 9,720,529 observations each
+# head(PGA)
+# Player.Name       Date        Statistic                    Variable Value
+# 1  Cameron Champ 2019-08-25 Driving Distance Driving Distance - (ROUNDS)    78
+# 2   Rory McIlroy 2019-08-25 Driving Distance Driving Distance - (ROUNDS)    72
+# 3      Luke List 2019-08-25 Driving Distance Driving Distance - (ROUNDS)    66
+#####
+
+# Unique Vectors (No Duplicates) for Each Categorical Variable
+PName <- as.vector(unique(PGA$Player.Name)) # Players
+RDate <- as.vector(unique(as.character(PGA$Date))) # Dates info was recorded
+SCtgry <- as.vector(unique(PGA$Statistic)) # Statistical categories
+CVar <- as.vector(unique(PGA$Variable)) # Category variables
+###
+# The dataset includes information on 1,449 players
+# The data was recorded on 31 different dates
+# The dataset contains 378 different statistical categories
+# The dataset has 1,496 category variables making around 4 vars per category
+#####
+
+# Generate a Player/Variable Data.Frame (PVdf)
+### Initialize the data.frame - Rows = Players, Cols = Variables
+
+variable_vec <- c("PlayerName",CVar) # Add player name to the variable list
+
+rr <- length(PName) # Number of rows in the dataframe
+
+cc <- length(variable_vec) # Number of columns in the dataframe
+
+player_frame<- data.frame(matrix(ncol = cc, nrow = rr)) # Create our empty df
+
+colnames(player_frame) <- variable_vec # Input the variable names into the columns
+
+player_frame$PlayerName <- PName # Input the Player Names
+### Gather the value data from the PGA data.frame
+
+num_rows <- length(PGA$Player.Name) # Num of rows in PGA dataset
+
+for (ii in 1:num_rows){ # For every observation in PGA
+  # Determine the location (row) of the player in player_frame
+  rLoc = which(player_frame$PlayerName == PGA$Player.Name[ii])
+  # Determine the location (col) of the variable in PVdf
+  cLoc = which(variable_vec == PGA$Variable[ii])
+  # Input the observation value into the correct location in PVdf
+  player_frame[rLoc,cLoc] <- PGA$Value[ii]
+}
+#####
+
+# Remove the data for all players who do not have FedExCup Points
+player_frame <- player_frame[!is.na(player_frame$`FedExCup Season Points - (POINTS)`),]
+
+
+player_frame$`FedExCup Season Points - (POINTS)`<-as.numeric(gsub(",", "", player_frame$`FedExCup Season Points - (POINTS)`))
+
+
+#create a new data frame with only the players names driving %, putting %, and Money won
+DP_frame<-data.frame(player_frame$PlayerName, player_frame$`Driving Distance - (AVG.)`, 
+                     player_frame$`Overall Putting Average - (AVG)`, player_frame$`Money per Event Leaders - (TOTAL MONEY)`)
+names(DP_frame) <- c("PlayerName", "AvgDrive", "PuttAvg", "TotalMoney")
+
+#filter out any players with NA values for any of the variables 
+
+DP_frame<- DP_frame[!is.na(DP_frame$AvgDrive),]
+DP_frame<- DP_frame[!is.na(DP_frame$PuttAvg),]
+DP_frame<- DP_frame[!is.na(DP_frame$TotalMoney),]
+
+#put the top 50 drivers into a group
+
+require(data.table)
+Drivers <- data.table(DP_frame, key="AvgDrive")
+Drivers[, head(.SD, 50), by=AvgDrive]
+Drivers<-Drivers[177:226]
+
+#change Driver money to numeric
+Drivers$TotalMoney<-as.numeric(gsub(",", '',gsub("[$,]", '', Drivers$TotalMoney)))
+
+#histogram of money won by the best drivers
+hist(Drivers$TotalMoney)
+
+#Summary stats and standard deviation on Driving group
+summary(Drivers)
+sd(Drivers$TotalMoney)
+
+#put the top 50 putters into a group
+Putters <- data.table(DP_frame, key="PuttAvg")
+Putters[, head(.SD, 50), by=PuttAvg]
+Putters<-Putters[1:50]
+
+#change Putter money to numeric
+Putters$TotalMoney<-as.numeric(gsub(",", '',gsub("[$,]", '', Putters$TotalMoney)))
+
+#histogram of money won by the best putters
+hist(Putters$TotalMoney)
+
+#Summary stats and standard deviation on Driving group
+summary(Putters)
+sd(Putters$TotalMoney)
+
+#Perform t-tests
+t.test(Drivers$TotalMoney, Putters$TotalMoney)
+t.test(Drivers$TotalMoney, DP_frame$TotalMoney)
+t.test(Putters$TotalMoney, DP_frame$TotalMoney)
